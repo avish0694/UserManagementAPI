@@ -84,5 +84,8 @@ public class User
     [MinLength(3, ErrorMessage = "Name must be at least 3 characters long.")]
     [MaxLength(50, ErrorMessage = "Name cannot be longer than 50 characters.")]
     public string Name { get; set; }
+    
+    [Required(ErrorMessage = "Email is required.")]
+    [EmailAddress(ErrorMessage = "Invalid email format.")]
     public string Email { get; set; }
 }
