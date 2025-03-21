@@ -18,11 +18,19 @@ app.UseHttpsRedirection();
 
 var users = new List<User>
 {
-    new User { Id = 1, Name = "Alice", Email = "alice@example.com" },
-    new User { Id = 2, Name = "Bob", Email = "bob@example.com" }
+    new User { Id = 1, Name = "Alice", Email = "alice@example.com", Password = "password123" },
+    new User { Id = 2, Name = "Bob", Email = "bob@example.com", Password = "password456" }
 };
 
-app.MapGet("/users", () => Results.Ok(users));
+var authenticatedUsers = new Dictionary<string, int>();
+
+
+// Get all users (only accessible if authenticated)
+app.MapGet("/users", (HttpContext httpContext) =>
+{
+    if (!IsAuthenticated(httpContext)) return Results.Unauthorized();
+    return Results.Ok(users);
+});
 
 // Get User by id
 app.MapGet("/users/{id}", (int id) =>
@@ -73,7 +81,45 @@ app.MapDelete("/users/{id}", (int id) =>
     return Results.NoContent();
 });
 
+
+// Login endpoint (authenticate user)
+app.MapPost("/login", (LoginRequest request) =>
+{
+    var user = users.FirstOrDefault(u => u.Email == request.Email && u.Password == request.Password);
+
+    if (user == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    // Store userId in the session for future requests
+    var sessionKey = Guid.NewGuid().ToString();  // Generate a unique session key
+    authenticatedUsers[sessionKey] = user.Id;
+
+    return Results.Ok(new { Message = "Login successful", SessionKey = sessionKey });
+});
+
+// Simple Logout (invalidate session)
+app.MapPost("/logout", (HttpContext httpContext) =>
+{
+    var sessionKey = httpContext.Request.Headers["SessionKey"].ToString();
+    if (authenticatedUsers.ContainsKey(sessionKey))
+    {
+        authenticatedUsers.Remove(sessionKey);
+        return Results.Ok(new { Message = "Logged out successfully." });
+    }
+
+    return Results.Unauthorized();
+});
+
 app.Run();
+
+// Check if the user is authenticated by the session key
+bool IsAuthenticated(HttpContext httpContext)
+{
+    var sessionKey = httpContext.Request.Headers["SessionKey"].ToString();
+    return authenticatedUsers.ContainsKey(sessionKey);
+}
 
 
 public class User
@@ -88,4 +134,18 @@ public class User
     [Required(ErrorMessage = "Email is required.")]
     [EmailAddress(ErrorMessage = "Invalid email format.")]
     public string Email { get; set; }
+    
+    [Required(ErrorMessage = "Password is required.")]
+    public string Password { get; set; } 
+}
+
+// Login request model
+public class LoginRequest
+{
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; }
+    
+    [Required]
+    public string Password { get; set; }
 }
