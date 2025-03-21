@@ -34,6 +34,17 @@ app.MapGet("/users/{id}", (int id) =>
 // Add a user
 app.MapPost("/users", (User user) =>
 {
+    var validationContext = new ValidationContext(user);
+    var validationResults = new List<ValidationResult>();
+
+    if (!Validator.TryValidateObject(user, validationContext, validationResults, true))
+    {
+        return Results.ValidationProblem(validationResults.ToDictionary(
+            v => v.MemberNames.FirstOrDefault() ?? "Error", 
+            v => new[] { v.ErrorMessage! }
+        ));
+    }
+
     user.Id = users.Count > 0 ? users.Max(u => u.Id) + 1 : 1;
     users.Add(user);
     return Results.Created($"/users/{user.Id}", user);
@@ -68,6 +79,10 @@ app.Run();
 public class User
 {
     public int Id { get; set; }
+    
+    [Required(ErrorMessage = "Name is required.")]
+    [MinLength(3, ErrorMessage = "Name must be at least 3 characters long.")]
+    [MaxLength(50, ErrorMessage = "Name cannot be longer than 50 characters.")]
     public string Name { get; set; }
     public string Email { get; set; }
 }
